@@ -518,7 +518,14 @@ public class User {
 	@JsonIgnore
 	private List<Subscription> subscriptions = new ArrayList<>();
 
-	// Helper method (very useful)
+//	// Helper method (very useful)
+//	public Subscription getActiveSubscription() {
+//	    return subscriptions.stream()
+//	            .filter(Subscription::isActive)
+//	            .filter(s -> s.getExpiryDate().isAfter(LocalDateTime.now()))
+//	            .findFirst()
+//	            .orElse(null);
+//	}
 	public Subscription getActiveSubscription() {
 	    return subscriptions.stream()
 	            .filter(Subscription::isActive)
@@ -526,7 +533,6 @@ public class User {
 	            .findFirst()
 	            .orElse(null);
 	}
-
 	public boolean hasActiveSubscription() {
 	    Subscription sub = getActiveSubscription();
 	    return sub != null;
@@ -624,10 +630,9 @@ public class User {
 	}
 	
 	// Add this field in User entity
+	// In User.java – keep this as is
 	@OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
 	private Shop shop;
-
-
 
 
 

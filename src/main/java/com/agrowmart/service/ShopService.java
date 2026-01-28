@@ -10,11 +10,13 @@ import com.agrowmart.repository.ShopRepository;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.awt.print.Pageable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -225,5 +227,42 @@ public List<ShopResponse> getPopularShopsPaginated(int page, int size) {
       .stream()
       .map(this::toResponse)
       .toList();
+}
+
+@Transactional
+public Shop createOrUpdateShop(ShopRequest req, User user) throws IOException {
+    // Only vendors allowed
+    if (!isVendor(user)) {
+        throw new IllegalStateException("Only vendors can create/update shop");
+    }
+
+    Optional<Shop> existing = shopRepository.findByUser(user);
+
+    Shop shop = existing.orElseGet(() -> {
+        Shop newShop = new Shop();
+        newShop.setUser(user);
+        newShop.setApproved(false);     // still needs admin approval
+        newShop.setActive(true);
+        return newShop;
+    });
+
+    // Update / set fields
+    if (req.shopName()        != null) shop.setShopName(req.shopName());
+    if (req.shopType()        != null) shop.setShopType(req.shopType());
+    if (req.shopAddress()     != null) shop.setShopAddress(req.shopAddress());
+    if (req.workingHours()    != null) shop.setWorkingHours(req.workingHours());
+    if (req.shopDescription() != null) shop.setShopDescription(req.shopDescription());
+    if (req.shopLicense()     != null) shop.setShopLicense(req.shopLicense());
+    if (req.opensAt()         != null) shop.setOpensAt(req.opensAt());
+    if (req.closesAt()        != null) shop.setClosesAt(req.closesAt());
+
+    // Images — replace only if sent
+    if (req.shopPhoto() != null && !req.shopPhoto().isEmpty()) {
+        if (shop.getShopPhoto() != null) cloudinaryService.delete(shop.getShopPhoto());
+        shop.setShopPhoto(cloudinaryService.upload(req.shopPhoto()));
+    }
+    // same for cover & license photo...
+
+    return shopRepository.save(shop);
 }
 }

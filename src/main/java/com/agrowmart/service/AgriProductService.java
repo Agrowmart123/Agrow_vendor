@@ -385,10 +385,14 @@ import com.agrowmart.entity.AgriProduct.*;
 import com.agrowmart.exception.SubscriptionLimitExceededException;
 import com.agrowmart.repository.AgriProductRepository;
 import com.agrowmart.repository.UserRepository;
+
+
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -531,6 +535,7 @@ public class AgriProductService {
     // ==================================================================
     // CREATE – protected by validation
     // ==================================================================
+    @Transactional   // ← THIS LINE IS CRUCIAL
     public AgriProductResponseDTO create(
             AgriProductCreateDTO dto,
             List<MultipartFile> imageFiles,
@@ -625,6 +630,7 @@ public class AgriProductService {
     // ==================================================================
     // UPDATE – protected by validation
     // ==================================================================
+    @Transactional   // ← THIS LINE IS CRUCIAL
     public AgriProductResponseDTO update(Long id, AgriProductCreateDTO dto, Authentication auth) {
         User vendor = getCurrentVendor(auth);
 
@@ -764,24 +770,30 @@ public class AgriProductService {
     // ==================================================================
     // Other methods (unchanged)
     // ==================================================================
+ // read-only methods can have readOnly = true
+    @Transactional(readOnly = true)
     public List<AgriProductResponseDTO> getAll() {
         return repository.findAll().stream()
                 .map(this::entityToDto)
                 .toList();
     }
-
+ // read-only methods can have readOnly = true
+    @Transactional(readOnly = true)
     public List<AgriProductResponseDTO> getMyProducts(Authentication auth) {
         User vendor = getCurrentVendor(auth);
         return repository.findByVendor(vendor).stream()
                 .map(this::entityToDto)
                 .toList();
     }
-
+ // read-only methods can have readOnly = true
+    @Transactional(readOnly = true)
     public AgriProductResponseDTO getById(Long id) {
         return entityToDto(repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found")));
     }
 
+    
+    @Transactional   // ← THIS LINE IS CRUCIAL
     public void delete(Long id, Authentication auth) {
         User vendor = getCurrentVendor(auth);
         BaseAgriProduct product = repository.findByIdAndVendor(id, vendor)
@@ -790,6 +802,8 @@ public class AgriProductService {
         repository.delete(product);
     }
 
+    
+    
     public List<AgriProductResponseDTO> search(String keyword) {
         return repository.search(keyword).stream()
                 .map(this::entityToDto)

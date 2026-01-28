@@ -11,6 +11,7 @@ import com.agrowmart.enums.OtpPurpose;
 import com.agrowmart.enums.RoleName;
 import com.agrowmart.repository.*;
 import com.agrowmart.util.InMemoryOtpStore;
+import com.agrowmart.util.RedisOtpStore;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.NotBlank;
@@ -36,7 +37,7 @@ public class AuthService {
     private final CloudinaryService cloudinaryService;
     private final FarmerProfileRepository farmerProfileRepo;
     private final Fast2SmsService fast2SmsService;  // NEW: Fast2SMS service
-  
+    private final RedisOtpStore redisOtpStore;
     @Value("${file.upload-dir}") private String localUploadDir;
     public AuthService(UserRepository userRepo,
                        RoleRepository roleRepo,
@@ -44,7 +45,8 @@ public class AuthService {
                        JwtService jwtService,
                        CloudinaryService cloudinaryService,
                        FarmerProfileRepository farmerProfileRepo,
-                       Fast2SmsService fast2SmsService  ) {
+                       Fast2SmsService fast2SmsService ,
+                       RedisOtpStore redisOtpStore) {
         this.userRepo = userRepo;
         this.roleRepo = roleRepo;
         this.encoder = encoder;
@@ -52,6 +54,7 @@ public class AuthService {
         this.cloudinaryService = cloudinaryService;
         this.farmerProfileRepo = farmerProfileRepo;
         this.fast2SmsService = fast2SmsService;
+        this.redisOtpStore = redisOtpStore;
       
     }
     @PostConstruct
@@ -83,6 +86,7 @@ public class AuthService {
             System.out.println("TOTAL LEGACY PHONES FIXED: " + fixed);
         }
     }
+    /* ------------------------------------------------- REGISTER ------------------------------------------------- */
     /* ------------------------------------------------- REGISTER ------------------------------------------------- */
     @Transactional
     public User register(RegisterRequest r) {
@@ -201,38 +205,40 @@ public class AuthService {
     }
        
     /* ------------------------------------------------- SEND OTP ------------------------------------------------- */
+//    @Transactional
+//    public void sendOtp(OtpRequest req) {
+//        String normalizedPhone = normalizePhone(req.phone());
+//        String code = String.format("%06d", new SecureRandom().nextInt(999999));
+//        InMemoryOtpStore.saveOtp(
+//                normalizedPhone,
+//                code,
+//                req.purpose(),
+//                300 // seconds (5 minutes)
+//        );
+//        System.out.println("OTP SENT → " + normalizedPhone + " | Code: " + code + " | Purpose: " + req.purpose());
+//     // Send via Fast2SMS (replaced Twilio)
+//        fast2SmsService.sendOtp(normalizedPhone, code, req.purpose().name());
+//    }
+    
     @Transactional
-    public void sendOtp(OtpRequest req) {
+    public void sendOtp(OtpRequest req) throws Exception {
         String normalizedPhone = normalizePhone(req.phone());
-        String code = String.format("%06d", new SecureRandom().nextInt(999999));
-        InMemoryOtpStore.saveOtp(
-                normalizedPhone,
-                code,
-                req.purpose(),
-                300 // seconds (5 minutes)
-        );
-        System.out.println("OTP SENT → " + normalizedPhone + " | Code: " + code + " | Purpose: " + req.purpose());
-     // Send via Fast2SMS (replaced Twilio)
-        fast2SmsService.sendOtp(normalizedPhone, code, req.purpose().name());
+
+        redisOtpStore.sendOtp(normalizedPhone, req.purpose());
     }
     /* ------------------------------------------------- VERIFY OTP ------------------------------------------------- */
     @Transactional
     public void verifyOtp(VerifyOtpRequest req) {
         String normalizedPhone = normalizePhone(req.phone());
         OtpPurpose purpose = req.purpose();
-        var otpData = InMemoryOtpStore.getOtp(normalizedPhone, purpose);
-        if (otpData == null) {
+      
+        
+        boolean valid = redisOtpStore.verifyOtp(normalizedPhone, req.code(), purpose);
+
+        if (!valid) {
             throw new IllegalArgumentException("Invalid or expired OTP");
         }
-        if (LocalDateTime.now().isAfter(otpData.expiresAt())) {
-            InMemoryOtpStore.removeOtp(normalizedPhone, purpose);
-            throw new IllegalArgumentException("OTP expired");
-        }
-        if (!otpData.otp().equals(req.code().trim())) {
-            throw new IllegalArgumentException("Wrong OTP");
-        }
-        // OTP is valid → remove it
-        InMemoryOtpStore.removeOtp(normalizedPhone, purpose);
+        
         // Only fetch user when needed
         if (purpose == OtpPurpose.PHONE_VERIFY) {
             User user = userRepo.findByPhone(normalizedPhone).orElse(null);
@@ -314,7 +320,7 @@ public class AuthService {
     }
     /* ------------------------------------------------- FORGOT PASSWORD ------------------------------------------------- */
     @Transactional
-    public void forgotPassword(String phone) {
+    public void forgotPassword(String phone) throws Exception {
         String normalized = normalizePhone(phone);
         if (!userRepo.existsByPhone(normalized)) {
             throw new IllegalArgumentException("No account found with this phone number");

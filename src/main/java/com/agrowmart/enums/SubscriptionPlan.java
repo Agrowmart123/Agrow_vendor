@@ -3,7 +3,7 @@ package com.agrowmart.enums;
 
 
 public enum SubscriptionPlan {
-    NONE(0, 0, "Free - No products allowed"),
+    NONE(10, 0, "Free - No products allowed"),
     STARTER(5, 499, "Starter - ₹499/month (max 5 products)"),
     GROWTH(10, 999, "Growth - ₹999/month (max 10 products)"),
     VISIBILITY(15, 1499, "Visibility - ₹1,499/month (max 15 products)"),

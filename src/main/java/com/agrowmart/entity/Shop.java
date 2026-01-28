@@ -19,7 +19,6 @@ public class Shop {
  @GeneratedValue(strategy = GenerationType.IDENTITY)
  private Long id;
  
- 
 
  @Column(nullable = false, length = 150)
  private String shopName;
@@ -39,7 +38,7 @@ public class Shop {
  @Column(length = 500)
  private String shopLicensePhoto;           // URL as String
 
- @Column(length = 100)
+ @Column(length = 1000)
  private String workingHours;
 
  @Column(length = 1000)

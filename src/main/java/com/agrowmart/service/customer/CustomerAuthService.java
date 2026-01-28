@@ -12,6 +12,8 @@ import com.agrowmart.service.Fast2SmsService;
 import com.agrowmart.service.JwtService;
 import com.agrowmart.util.InMemoryOtpStore;
 import com.agrowmart.util.InMemoryOtpStore.OtpData;
+import com.agrowmart.util.RateLimiterUtil;
+import com.agrowmart.util.RedisOtpStore;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
@@ -29,32 +31,37 @@ import java.util.Set;
 @Service
 public class CustomerAuthService {
 
+	
+	
+	
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final CloudinaryService cloudinaryService;
     private final Fast2SmsService fast2SmsService;  // NEW
-
+    private final RedisOtpStore redisOtpStore;
 
     public CustomerAuthService(CustomerRepository customerRepository,
                                PasswordEncoder passwordEncoder,
                                JwtService jwtService,
                                CloudinaryService cloudinaryService,
-                               Fast2SmsService fast2SmsService) {
+                               Fast2SmsService fast2SmsService,
+                               RedisOtpStore redisOtpStore) {
         this.customerRepository = customerRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.cloudinaryService = cloudinaryService;
         this.fast2SmsService = fast2SmsService;
+        this.redisOtpStore = redisOtpStore;
     }
 
 
     @Transactional
-    public Customer register(CustomerRegisterRequest req) {
+    public Customer register(CustomerRegisterRequest req) throws Exception {
         String phone = normalizePhone(req.phone());
+        String email = req.email() != null ? req.email().trim().toLowerCase() : null;
 
-        if (req.email() != null && !req.email().isBlank() &&
-            customerRepository.existsByEmail(req.email().trim().toLowerCase())) {
+        if (email != null && customerRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("Email already registered");
         }
         if (customerRepository.existsByPhone(phone)) {
@@ -63,18 +70,21 @@ public class CustomerAuthService {
 
         Customer customer = new Customer();
         customer.setFullName(req.fullName().trim());
-        if (req.email() != null && !req.email().isBlank()) {
-            customer.setEmail(req.email().trim().toLowerCase());
-        }
+        customer.setEmail(email);
         customer.setPhone(phone);
         customer.setPasswordHash(passwordEncoder.encode(req.password()));
         customer.setPhoneVerified(false);
         customer.setActive(true);
 
         Customer saved = customerRepository.save(customer);
-        sendOtp(phone, OtpPurpose.PHONE_VERIFY); // Auto-send OTP
+
+        // Auto-send OTP for phone verification
+//        sendOtp(phone, OtpPurpose.PHONE_VERIFY);
+
         return saved;
     }
+    
+    
 
     public JwtResponse login(CustomerLoginRequest req) {
         String input = req.login().trim();
@@ -127,20 +137,33 @@ public class CustomerAuthService {
     
   //--------------------  
  // UPDATED: Now using Fast2SMS instead of Twilio
-    public void sendOtp(String phone, OtpPurpose purpose) {
-        String normalizedPhone = normalizePhone(phone);
-        String code = String.format("%06d", new SecureRandom().nextInt(999999));
-
-        InMemoryOtpStore.saveOtp(normalizedPhone, code, purpose.name(), 300);
-
-        String message = "AgroMart OTP: " + code + " (valid 5 min)";
-
-        // Send via Fast2SMS (Twilio removed)
-        fast2SmsService.sendOtp(normalizedPhone, code, purpose.name());
+//    @Transactional
+//    public void sendOtp(String phone, OtpPurpose purpose) {
+//        String normalizedPhone = normalizePhone(phone);
+//        
+//     // Rate limiting
+//        String rateKey = "rate:otp:customer:" + normalizedPhone;
+//        if (!RateLimiterUtil.isAllowed(rateKey, MAX_OTP_PER_HOUR, RATE_LIMIT_WINDOW_SECONDS)) {
+//            log.warn("OTP rate limit exceeded for customer phone: {}", normalizedPhone);
+//            throw new Exception("Too many OTP requests. Try again after 1 hour.");
+//        }
+//        String code = String.format("%06d", new SecureRandom().nextInt(999999));
+//
+//        InMemoryOtpStore.saveOtp(normalizedPhone, code, purpose.name(), 300);
+//
+//        String message = "AgroMart OTP: " + code + " (valid 5 min)";
+//
+//        // Send via Fast2SMS (Twilio removed)
+//        fast2SmsService.sendOtp(normalizedPhone, code, purpose.name());
+//    }
+//    
+    
+//    
+    
+    @Transactional
+    public void sendOtp(String phone, OtpPurpose purpose) throws Exception {
+        redisOtpStore.sendOtp(phone, purpose);
     }
-    
-    
-    
     
 
     @Transactional
@@ -148,16 +171,13 @@ public class CustomerAuthService {
         String normalizedPhone = normalizePhone(req.phone());
         OtpPurpose purpose = OtpPurpose.valueOf(req.purpose());
 
-        var otpData = InMemoryOtpStore.getOtp(normalizedPhone, purpose.name());
-        if (otpData == null || LocalDateTime.now().isAfter(((JwtResponse) otpData).expiresAt())) {
+        boolean valid = redisOtpStore.verifyOtp(normalizedPhone, req.code(), purpose);
+
+        if (!valid) {
             throw new IllegalArgumentException("Invalid or expired OTP");
         }
-        if (!((OtpData) otpData).otp().equals(req.code().trim())) {
-            throw new IllegalArgumentException("Wrong OTP");
-        }
-
-        InMemoryOtpStore.removeOtp(normalizedPhone, purpose.name());
-
+        
+        
         if (purpose == OtpPurpose.PHONE_VERIFY) {
             Customer customer = customerRepository.findByPhone(normalizedPhone)
                     .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
@@ -167,7 +187,7 @@ public class CustomerAuthService {
     }
 
     @Transactional
-    public void forgotPassword(String phone) {
+    public void forgotPassword(String phone) throws Exception {
         String normalized = normalizePhone(phone);
         if (!customerRepository.existsByPhone(normalized)) {
             throw new IllegalArgumentException("No account found with this phone number");

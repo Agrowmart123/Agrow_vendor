@@ -31,7 +31,7 @@ public class FarmerController {
     }
 
     @PostMapping("/send-otp")
-    public ResponseEntity<String> sendOtp(@Valid @RequestBody OtpRequest req) {
+    public ResponseEntity<String> sendOtp(@Valid @RequestBody OtpRequest req) throws Exception {
         authService.sendOtp(req);
         return ResponseEntity.ok("OTP sent successfully");
     }
@@ -56,7 +56,7 @@ public class FarmerController {
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req) {
+    public ResponseEntity<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req) throws Exception {
         authService.forgotPassword(req.phone());
         return ResponseEntity.ok("OTP sent to reset password");
     }

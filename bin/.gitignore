@@ -1,0 +1,78 @@
+##################################
+# Maven / Gradle
+##################################
+/target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+/build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+##################################
+# Environment / Secrets (CRITICAL)
+##################################
+
+# Firebase / Cloud / Keys
+
+
+# Spring credentials (contains real secrets)
+**/application.properties
+
+
+# Firebase / Cloud / Keys
+# serviceAccountKey.json
+# serviceAccountKey-prod.json
+# serviceAccountKey-dev.json
+# application.properties
+/secrets/
+*.pem
+*.key
+*.crt
+
+##################################
+# Logs
+##################################
+logs/
+*.log
+
+##################################
+# IDEs
+##################################
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### Spring Tool Suite / Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+### VS Code ###
+.vscode/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+##################################
+# OS Files
+##################################
+.DS_Store
+Thumbs.db
+
+##################################
+# Misc
+##################################
+HELP.md

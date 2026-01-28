@@ -1,4 +1,7 @@
 package com.agrowmart.dto.auth;
+
+import java.time.LocalTime;
+
 public record MeResponse(
         Long id,
         String uuid,
@@ -41,6 +44,22 @@ public record MeResponse(
         String panStatus,
         String udhyamStatus,
 
+        
+        String shopName,
+        String shopType,
+        String shopAddress,
+        String shopPhoto,
+        String shopCoverPhoto,
+        String shopLicensePhoto,
+        String workingHours,
+        String shopDescription,
+        String shopLicense,
+        LocalTime opensAt,
+        LocalTime closesAt,
+        boolean isApproved,
+        boolean isActive,
+        
+        
         String createdAt,
         String updatedAt
 ) {}

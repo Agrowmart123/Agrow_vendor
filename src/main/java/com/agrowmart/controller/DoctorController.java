@@ -61,7 +61,7 @@ public class DoctorController {
     }
     
     @PostMapping("/send-otp")
-    public ResponseEntity<?> sendOtp(@Valid @RequestBody OtpRequest req) {
+    public ResponseEntity<?> sendOtp(@Valid @RequestBody OtpRequest req) throws Exception {
         authService.sendOtp(req);
         return ResponseEntity.ok(Map.of(
                 "success", true,
